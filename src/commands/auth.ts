@@ -1,4 +1,3 @@
-import { createInterface } from 'node:readline';
 import type { Command } from 'commander';
 import { action } from '../command.ts';
 import { clearConfig, configPath, saveConfig } from '../config.ts';
@@ -10,18 +9,41 @@ export function mask(secret: string): string {
     return secret.length <= 8 ? '••••' : `${secret.slice(0, 4)}…${secret.slice(-4)}`;
 }
 
-/** Prompts on stderr without echoing what is typed. */
+/**
+ * Prompts on stderr without echoing what is typed. Reads the terminal in raw
+ * mode: readline would redraw the line and wipe the prompt.
+ */
 function promptSecret(question: string): Promise<string> {
+    const stdin = process.stdin;
+    process.stderr.write(question);
+    stdin.setRawMode(true);
+    stdin.setEncoding('utf8');
+    stdin.resume();
     return new Promise((resolve) => {
-        const rl = createInterface({ input: process.stdin, output: process.stderr, terminal: true });
-        const internal = rl as unknown as { _writeToOutput: (text: string) => void };
-        process.stderr.write(question);
-        internal._writeToOutput = () => {};
-        rl.question('', (answer) => {
-            rl.close();
+        let value = '';
+        const finish = () => {
+            stdin.off('data', onData);
+            stdin.setRawMode(false);
+            stdin.pause();
             process.stderr.write('\n');
-            resolve(answer);
-        });
+        };
+        const onData = (chunk: string) => {
+            for (const char of chunk) {
+                if (char === '\r' || char === '\n' || char === '\u0004') {
+                    finish();
+                    resolve(value);
+                    return;
+                }
+                if (char === '\u0003') {
+                    // Ctrl+C: raw mode swallows SIGINT, so exit the way the shell expects.
+                    finish();
+                    process.exit(130);
+                }
+                if (char === '\u007f' || char === '\b') value = value.slice(0, -1);
+                else value += char;
+            }
+        };
+        stdin.on('data', onData);
     });
 }
 
@@ -35,9 +57,15 @@ export function registerAuth(program: Command): void {
         )
         .action(
             action(async (ctx) => {
-                const raw =
-                    ctx.opts.apiKey ??
-                    (process.stdin.isTTY ? await promptSecret('API key: ') : await readTextArg('-'));
+                let raw = ctx.opts.apiKey;
+                if (raw === undefined && process.stdin.isTTY) {
+                    process.stderr.write(
+                        'Paste your Perspective API key (create one under Settings → API Keys in the app).\n' +
+                            'Input is hidden.\n\n',
+                    );
+                    raw = await promptSecret('API key: ');
+                }
+                raw ??= await readTextArg('-');
                 const key = raw.trim();
                 if (!key) throw new CliError('usage', 'Empty API key');
                 // Validate before storing: a cheap authenticated read.
