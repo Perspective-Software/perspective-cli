@@ -14,7 +14,7 @@ interface ContactsPage {
 }
 
 export function registerContacts(program: Command): void {
-    const contacts = program.command('contacts').description("A funnel's CRM contacts (REST, needs an API key)");
+    const contacts = program.command('contacts').description("A funnel's CRM contacts");
 
     contacts
         .command('list')

@@ -1,14 +1,12 @@
 # perspective-cli — agent notes
 
-- TypeScript, ESM, Node ≥ 22.12. Runtime dependency: `commander` only. Keep it that way;
-  the MCP client is hand-rolled on purpose (the hosted server is stateless Streamable HTTP,
-  so one POST per JSON-RPC call), avoiding the SDK's server-side dependency tree.
-- Contract that must not break: stdout is JSON only (human text goes to stderr via
-  `info()`); errors are `CliError` → JSON on stderr; exit codes in `src/errors.ts` are never
+- TypeScript, ESM, Node ≥ 22.12. Runtime dependency: `commander` only. Keep it that way.
+- Scope: a wrapper for the External API (`/v1`, `x-perspective-api-key`) and nothing else.
+  The MCP server is a separate product for chat assistants; don't add MCP or OAuth here.
+- Contract that must not break: stdout is JSON only (prompts and other human text go to
+  stderr); errors are `CliError` → JSON on stderr; exit codes in `src/errors.ts` are never
   renumbered.
 - Every command goes through `action()` in `src/command.ts`.
-- Two credentials: API key (`x-perspective-api-key`) for REST `/v1`, OAuth bearer for
-  `/mcp`. The server does not accept one for the other.
 - Changing a command means updating `skills/perspective/SKILL.md`, `README.md`, and the
   developer docs (`developer-docs/docs/cli/`).
 - Verify with `npm run typecheck`, `npm test` and `npm run build`.

@@ -5,7 +5,6 @@ import { registerAuth } from './commands/auth.ts';
 import { registerContacts } from './commands/contacts.ts';
 import { registerMetrics } from './commands/metrics.ts';
 import { registerSkill } from './commands/skill.ts';
-import { registerTools } from './commands/tools.ts';
 import { registerWorkspaces } from './commands/workspaces.ts';
 import { ExitCode } from './errors.ts';
 import { printError } from './output.ts';
@@ -22,8 +21,7 @@ function buildProgram(): Command {
         )
         .version(version)
         .option('--base-url <url>', 'API origin (env PERSPECTIVE_BASE_URL)', undefined)
-        .option('--api-key <key>', 'REST API key (env PERSPECTIVE_API_KEY)')
-        .option('--token <token>', 'OAuth access token for MCP tools (env PERSPECTIVE_TOKEN)')
+        .option('--api-key <key>', 'API key (env PERSPECTIVE_API_KEY)')
         .option('--pretty', 'indent JSON output (default when stdout is a terminal)')
         .option('--no-pretty', 'compact JSON output (default when piped)')
         .showHelpAfterError()
@@ -33,7 +31,6 @@ function buildProgram(): Command {
     registerWorkspaces(program);
     registerContacts(program);
     registerMetrics(program);
-    registerTools(program);
     registerSkill(program);
     return program;
 }

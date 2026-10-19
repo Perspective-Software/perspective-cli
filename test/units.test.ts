@@ -1,8 +1,7 @@
-import { createHash } from 'node:crypto';
 import { mkdtemp, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { mask } from '../src/commands/auth.ts';
 import { KPI_SUBTYPES, normalizeSubtype, resolveWindow } from '../src/commands/metrics.ts';
 import { flattenFunnels } from '../src/commands/workspaces.ts';
@@ -10,7 +9,6 @@ import { configPath, loadConfig, saveConfig } from '../src/config.ts';
 import { Context } from '../src/context.ts';
 import { CliError } from '../src/errors.ts';
 import { applyAssignments, parseAssignment } from '../src/input.ts';
-import { createPkcePair, isExpired } from '../src/oauth.ts';
 
 describe('assignments', () => {
     it('parses JSON values and falls back to strings', () => {
@@ -57,19 +55,7 @@ describe('flattenFunnels', () => {
     });
 });
 
-describe('oauth helpers', () => {
-    it('creates an S256 PKCE pair', () => {
-        const { verifier, challenge } = createPkcePair();
-        expect(verifier).toMatch(/^[A-Za-z0-9_-]{43}$/);
-        expect(challenge).toBe(createHash('sha256').update(verifier).digest('base64url'));
-    });
-
-    it('treats tokens as expired one minute early', () => {
-        expect(isExpired({ accessToken: 'a', clientId: 'c', expiresAt: 1_000_000 }, 1_000_000 - 30_000)).toBe(true);
-        expect(isExpired({ accessToken: 'a', clientId: 'c', expiresAt: 1_000_000 }, 1_000_000 - 120_000)).toBe(false);
-        expect(isExpired({ accessToken: 'a', clientId: 'c' })).toBe(false);
-    });
-
+describe('auth', () => {
     it('masks secrets', () => {
         expect(mask('abcd1234efgh')).toBe('abcd…efgh');
         expect(mask('short')).toBe('••••');
@@ -77,8 +63,6 @@ describe('oauth helpers', () => {
 });
 
 describe('config + context', () => {
-    afterEach(() => vi.unstubAllGlobals());
-
     async function tempEnv(): Promise<NodeJS.ProcessEnv> {
         return { PERSPECTIVE_CONFIG_DIR: await mkdtemp(join(tmpdir(), 'pcli-')) };
     }
@@ -104,28 +88,6 @@ describe('config + context', () => {
     it('fails with unauthenticated when nothing is configured', async () => {
         const env = await tempEnv();
         await expect(new Context({}, env).apiKey()).rejects.toMatchObject({ code: 'unauthenticated' });
-        await expect(new Context({}, env).accessToken()).rejects.toMatchObject({ code: 'unauthenticated' });
     });
 
-    it('refreshes an expired token and persists it', async () => {
-        const env = await tempEnv();
-        await saveConfig(
-            { oauth: { accessToken: 'old', refreshToken: 'r1', expiresAt: Date.now() - 1000, clientId: 'c' } },
-            env,
-        );
-        const fetchMock = vi.fn(async () =>
-            new Response(JSON.stringify({ access_token: 'new', expires_in: 3600 }), {
-                status: 200,
-                headers: { 'content-type': 'application/json' },
-            }),
-        );
-        vi.stubGlobal('fetch', fetchMock);
-
-        expect(await new Context({ baseUrl: 'https://api.example.com' }, env).accessToken()).toBe('new');
-        const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
-        expect(url).toBe('https://api.example.com/oauth/token');
-        expect(String(init.body)).toContain('grant_type=refresh_token');
-        const saved = await loadConfig(env);
-        expect(saved.oauth).toMatchObject({ accessToken: 'new', refreshToken: 'r1', clientId: 'c' });
-    });
 });

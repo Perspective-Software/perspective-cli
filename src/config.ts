@@ -4,18 +4,9 @@ import { join } from 'node:path';
 
 export const DEFAULT_BASE_URL = 'https://api.perspective.co';
 
-export interface StoredOAuth {
-    accessToken: string;
-    refreshToken?: string;
-    /** Epoch milliseconds. */
-    expiresAt?: number;
-    clientId: string;
-}
-
 export interface StoredConfig {
     baseUrl?: string;
     apiKey?: string;
-    oauth?: StoredOAuth;
 }
 
 export function configDir(env: NodeJS.ProcessEnv = process.env): string {

@@ -11,7 +11,7 @@ export interface RestRequest {
 
 const USER_AGENT = 'perspective-cli';
 
-/** Client for the REST API under /v1. Returns the parsed JSON body as-is ({data} / {data, meta}). */
+/** Client for the External API under /v1. Returns the parsed JSON body as-is ({data} / {data, meta}). */
 export class RestClient {
     readonly baseUrl: string;
     private readonly apiKey: string;

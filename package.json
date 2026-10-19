@@ -1,7 +1,7 @@
 {
   "name": "@perspective-software/cli",
   "version": "0.1.0",
-  "description": "Command-line interface for the Perspective External API and MCP server",
+  "description": "Command-line interface for the Perspective External API",
   "private": true,
   "license": "UNLICENSED",
   "type": "module",

@@ -1,9 +1,9 @@
 # Perspective CLI
 
-`perspective` drives [Perspective](https://perspective.co) from the shell. It covers the
-[External REST API](https://developers.perspective.co/api-reference/overview) and every tool of
-the [MCP server](https://developers.perspective.co/mcp/overview), and it is built to be driven
-by both people and coding agents: output is JSON, errors are JSON, and exit codes are stable.
+`perspective` drives [Perspective](https://perspective.co) from the shell. It wraps the
+[External API](https://developers.perspective.co/api-reference/overview) and is built to be
+driven by both people and coding agents: output is JSON, errors are JSON, and exit codes are
+stable.
 
 Full docs: <https://developers.perspective.co/cli/overview>
 
@@ -18,21 +18,16 @@ perspective --help
 
 ## Authenticate
 
-Two credentials, one per API surface:
-
-| Command | Credential | Unlocks |
-|---|---|---|
-| `perspective auth login` | OAuth (browser login, refreshed automatically) | `tools …` (MCP: funnels, sequences, brands, stats, …) |
-| `perspective auth login --with-api-key` | API key from Settings → API Keys (read from stdin) | `workspaces`, `funnels`, `contacts`, `metrics` |
+The CLI uses an API key from Perspective → Settings → API Keys.
 
 ```bash
-perspective auth login                                   # opens the browser
-printf %s "$KEY" | perspective auth login --with-api-key # stores and validates an API key
+perspective auth login                        # prompts for the key, validates it, stores it
+printf %s "$KEY" | perspective auth login     # or pipe it in
 perspective auth status
 ```
 
-Credentials are stored in `~/.config/perspective/credentials.json` (mode 0600). In CI, set
-`PERSPECTIVE_API_KEY` and/or `PERSPECTIVE_TOKEN` instead. Precedence is flag → env → file.
+The key is stored in `~/.config/perspective/credentials.json` (mode 0600). In CI, set
+`PERSPECTIVE_API_KEY` instead. Precedence is `--api-key` flag → env → file.
 
 ## Use
 
@@ -42,11 +37,6 @@ perspective contacts list <funnelId> --all
 perspective contacts create <funnelId> --email ada@example.com --first-name Ada
 perspective metrics kpi <funnelId> conversion_rate --days 7
 perspective metrics chart <funnelId> visitor_devices --from 2026-09-01 --to 2026-10-01
-
-perspective tools list --scope funnel-build
-perspective tools describe create_funnel
-perspective tools call get_funnel_stats -a funnelId=<funnelId>
-perspective tools call create_funnel --input @brief.json
 ```
 
 Output is pretty-printed at a terminal and compact when piped (`--pretty` / `--no-pretty`).
@@ -56,7 +46,7 @@ Output is pretty-printed at a terminal and compact when piped (`--pretty` / `--n
 | Code | Meaning |
 |---|---|
 | 0 | success |
-| 1 | API or tool error |
+| 1 | API error |
 | 2 | usage error (bad flags/arguments, HTTP 400) |
 | 3 | not authenticated (HTTP 401) |
 | 4 | forbidden (HTTP 403) |
@@ -64,7 +54,7 @@ Output is pretty-printed at a terminal and compact when piped (`--pretty` / `--n
 | 6 | rate limited (HTTP 429, 100 requests/minute) |
 | 7 | network error |
 
-Errors go to stderr as `{"error":{"code","message","status?","hint?","details?"}}`.
+Errors go to stderr as `{"error":{"code","message","status?","hint?"}}`.
 
 ## Agents
 
@@ -88,8 +78,7 @@ perspective --base-url http://localhost:3000 …   # point at a local External A
 ```
 
 Layout: `src/cli.ts` (entry) · `src/commands/*` (one file per command group) · `src/rest.ts`
-(REST client) · `src/mcp.ts` (stateless MCP JSON-RPC client) · `src/oauth.ts` (PKCE loopback
-login) · `src/context.ts` (credential resolution) · `skills/perspective/SKILL.md`.
+(API client) · `src/context.ts` (credential resolution) · `skills/perspective/SKILL.md`.
 
 When you add or change a command, update `SKILL.md` and the docs in
 `Perspective-Software/developer-docs` (`docs/cli/`) in the same change.

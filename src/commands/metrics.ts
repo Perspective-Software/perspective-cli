@@ -70,7 +70,7 @@ function withWindow(cmd: Command): Command {
 export function registerMetrics(program: Command): void {
     const metrics = program
         .command('metrics')
-        .description('Funnel analytics: KPIs, charts and question insights (REST, needs an API key)');
+        .description('Funnel analytics: KPIs, charts and question insights');
 
     withWindow(
         metrics

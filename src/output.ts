@@ -25,8 +25,3 @@ export function printError(err: unknown, opts: OutputOptions = {}): number {
     );
     return cliError.exitCode;
 }
-
-/** Human-facing progress text. Always stderr, so stdout stays pure JSON. */
-export function info(message: string): void {
-    process.stderr.write(`${message}\n`);
-}

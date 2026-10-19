@@ -22,12 +22,10 @@ export type ErrorCode =
     | 'forbidden'
     | 'not_found'
     | 'rate_limited'
-    | 'network'
-    | 'tool_error';
+    | 'network';
 
 const EXIT_BY_CODE: Record<ErrorCode, ExitCodeValue> = {
     error: ExitCode.ERROR,
-    tool_error: ExitCode.ERROR,
     usage: ExitCode.USAGE,
     unauthenticated: ExitCode.UNAUTHENTICATED,
     forbidden: ExitCode.FORBIDDEN,
