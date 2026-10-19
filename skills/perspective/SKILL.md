@@ -29,7 +29,7 @@ Never print, log or commit an API key.
 Almost everything takes a `funnelId`. Get it first:
 
 ```bash
-perspective funnels list --name "webinar"          # flat list: id, name, status, workspaceId
+perspective funnels list --name "webinar"          # flat list: id, name, status (draft|live|offline), workspaceId
 perspective workspaces list                         # nested: workspaces → campaigns
 ```
 
@@ -77,7 +77,7 @@ perspective funnels list --status live --fields id,name
 | 1 | `error` | API error — read `error.message` |
 | 2 | `usage` | Bad arguments or 400 from the API — fix the call (see `error.hint`) |
 | 3 | `unauthenticated` | Missing/invalid API key — see step 0 |
-| 4 | `forbidden` | Key lacks the permission (`crm:read`, `crm:write`, `metrics:read`) or plan |
+| 4 | `forbidden` | Funnel ID wrong or in another workspace (re-check with `funnels list`), or the key lacks a permission (`crm:read`, `crm:write`, `metrics:read`) |
 | 5 | `not_found` | Wrong funnel or contact ID — re-discover IDs |
 | 6 | `rate_limited` | 100 requests/minute; the CLI already retried — wait a minute; prefer `--all` over many small calls |
 | 7 | `network` | API unreachable |
