@@ -50,8 +50,8 @@ describe('metrics helpers', () => {
 describe('flattenFunnels', () => {
     it('lifts campaigns out of workspaces', () => {
         expect(
-            flattenFunnels([{ id: 'w1', name: 'Main', campaigns: [{ id: 'f1', name: 'Quiz', status: 'online' }] }]),
-        ).toEqual([{ id: 'f1', name: 'Quiz', status: 'online', workspaceId: 'w1', workspaceName: 'Main' }]);
+            flattenFunnels([{ id: 'w1', name: 'Main', campaigns: [{ id: 'f1', name: 'Quiz', status: 'live' }] }]),
+        ).toEqual([{ id: 'f1', name: 'Quiz', status: 'live', workspaceId: 'w1', workspaceName: 'Main' }]);
     });
 });
 

@@ -1,4 +1,4 @@
-import type { Command } from 'commander';
+import { Option, type Command } from 'commander';
 import { action } from '../command.ts';
 import { RestClient } from '../rest.ts';
 
@@ -32,7 +32,7 @@ export function registerWorkspaces(program: Command): void {
         .description('Funnels across all workspaces')
         .command('list')
         .description('List every funnel as a flat list — the quickest way to find a funnel ID')
-        .option('--status <status>', 'only funnels with this status (online|offline)')
+        .addOption(new Option('--status <status>', 'only funnels with this status').choices(['draft', 'live', 'offline']))
         .option('--name <text>', 'only funnels whose name contains this text (case-insensitive)')
         .action(
             action(async (ctx, opts: { status?: string; name?: string }) => {

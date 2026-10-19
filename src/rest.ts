@@ -72,7 +72,8 @@ function httpError(res: Response, body: unknown): CliError {
         code === 'unauthenticated'
             ? 'Check your API key (`perspective auth status`).'
             : code === 'forbidden'
-              ? 'The API key lacks the permission this endpoint needs (e.g. crm:read, metrics:read).'
+              ? 'Either the funnel ID is wrong or not in a workspace this key can access (check `perspective funnels list`), ' +
+                'or the key lacks the permission this endpoint needs (crm:read, crm:write, metrics:read).'
               : code === 'rate_limited'
                 ? `Rate limit is 100 requests/minute.${retryAfter ? ` Retry in ${retryAfter}s.` : ''}`
                 : undefined;

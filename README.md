@@ -32,7 +32,7 @@ The key is stored in `~/.config/perspective/credentials.json` (mode 0600). In CI
 ## Use
 
 ```bash
-perspective funnels list --status online
+perspective funnels list --status live
 perspective contacts list <funnelId> --all
 perspective contacts create <funnelId> --email ada@example.com --first-name Ada
 perspective metrics kpi <funnelId> conversion_rate --days 7
