@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { mask } from '../src/commands/auth.ts';
-import { KPI_SUBTYPES, normalizeSubtype, resolveWindow } from '../src/commands/metrics.ts';
+import { KPI_SUBTYPES, normalizeSubtype, resolveKpis, resolveWindow } from '../src/commands/metrics.ts';
 import { flattenFunnels } from '../src/commands/workspaces.ts';
 import { configPath, loadConfig, saveConfig } from '../src/config.ts';
 import { Context } from '../src/context.ts';
@@ -125,5 +125,22 @@ describe('selectFields', () => {
     it('works on a single object and on results without a data envelope', () => {
         expect(selectFields({ data: { type: 'kpi', value: 3 } }, 'value')).toEqual({ data: { value: 3 } });
         expect(selectFields({ kpi: ['a'], chart: ['b'] }, 'kpi')).toEqual({ kpi: ['a'] });
+    });
+});
+
+describe('resolveKpis', () => {
+    it('normalizes names, keeps their order and drops repeats', () => {
+        expect(resolveKpis(['total_sessions', 'kpi_conversion_rate', 'total-sessions'])).toEqual([
+            'kpi_total_sessions',
+            'kpi_conversion_rate',
+        ]);
+    });
+
+    it('expands all to every KPI', () => {
+        expect(resolveKpis(['all'])).toEqual(KPI_SUBTYPES);
+    });
+
+    it('rejects unknown names with the valid list', () => {
+        expect(() => resolveKpis(['conversion_rate', 'bogus'])).toThrow(CliError);
     });
 });

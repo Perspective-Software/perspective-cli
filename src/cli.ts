@@ -6,7 +6,7 @@ import { registerContacts } from './commands/contacts.ts';
 import { registerMetrics } from './commands/metrics.ts';
 import { registerSkill } from './commands/skill.ts';
 import { registerWorkspaces } from './commands/workspaces.ts';
-import { ExitCode } from './errors.ts';
+import { CliError, ExitCode } from './errors.ts';
 import { printError } from './output.ts';
 
 const { version } = JSON.parse(
@@ -25,7 +25,9 @@ function buildProgram(): Command {
         .option('--fields <list>', 'only these fields of each result, comma-separated; dots nest (id,email,properties.city)')
         .option('--pretty', 'indent JSON output (default when stdout is a terminal)')
         .option('--no-pretty', 'compact JSON output (default when piped)')
-        .showHelpAfterError()
+        // Parse errors (unknown option, missing argument, invalid choice) are printed as JSON
+        // in the catch below; commander's own text would break the stderr contract.
+        .configureOutput({ outputError: () => {} })
         .exitOverride();
 
     registerAuth(program);
@@ -40,8 +42,16 @@ try {
     await buildProgram().parseAsync(process.argv);
 } catch (err) {
     if (err instanceof CommanderError) {
-        // Commander already printed help/version/the usage message.
-        process.exitCode = err.exitCode === 0 ? ExitCode.OK : ExitCode.USAGE;
+        if (err.exitCode === 0 || err.code === 'commander.help') {
+            // Help or version text, already printed by commander.
+            process.exitCode = err.exitCode === 0 ? ExitCode.OK : ExitCode.USAGE;
+        } else {
+            process.exitCode = printError(
+                new CliError('usage', err.message.replace(/^error: /, '').replace(/\s*\n\s*/g, ' '), {
+                    hint: 'Run the command with --help to see its arguments and options.',
+                }),
+            );
+        }
     } else {
         process.exitCode = printError(err);
     }

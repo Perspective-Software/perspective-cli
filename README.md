@@ -38,6 +38,7 @@ perspective contacts list <funnelId> --all --fields id,email,status
 perspective contacts create <funnelId> --email ada@example.com --first-name Ada --dry-run
 perspective contacts create <funnelId> --email ada@example.com --first-name Ada
 perspective metrics kpi <funnelId> conversion_rate --days 7
+perspective metrics kpi <funnelId> all --fields type,value,count
 perspective metrics chart <funnelId> visitor_devices --from 2026-09-01 --to 2026-10-01
 ```
 

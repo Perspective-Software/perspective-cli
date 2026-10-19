@@ -53,11 +53,29 @@ The default window is the last 30 days in local time.
 
 ```bash
 perspective metrics kpi <funnelId> conversion_rate
+perspective metrics kpi <funnelId> conversion_rate total_sessions   # several → {data: [...]}, each with its type
+perspective metrics kpi <funnelId> all --fields type,value,count    # every KPI in one call
 perspective metrics kpi <funnelId> new_contacts --from 2026-09-01 --to 2026-10-01
 perspective metrics chart <funnelId> page_to_page_conversion_rate --ab-test variant
 perspective metrics insight <funnelId> question_1234 --days 7
 perspective metrics subtypes                        # valid kpi/chart names
 ```
+
+What a KPI's `value` means:
+
+| KPI | `value` | `count` |
+|---|---|---|
+| `conversion_rate`, `completion_rate` | % of sessions (0–100) | conversions / completions |
+| `messages_delivery_rate`, `messages_open_rate` | % of messages (0–100) | the events behind the rate |
+| `average_time_on_page` | seconds (average over pages of each page's median) | — |
+| `time_to_completion` | seconds, median from first page to completion | — |
+| `new_contacts`, `total_sessions`, `messages_sent` | count | — |
+
+A rate on a handful of sessions means little: before you rank or compare funnels,
+fetch `total_sessions` with it (`kpi <id> conversion_rate total_sessions`) and
+mention low sample sizes. `metrics insight` needs the question's element ID from
+the funnel builder; there is no way to list them, so ask the user. An unknown
+ID returns an empty result, not an error.
 
 ## Keep output small
 

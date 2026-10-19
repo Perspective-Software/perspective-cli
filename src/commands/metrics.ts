@@ -36,6 +36,12 @@ export function normalizeSubtype(raw: string, prefix: 'kpi' | 'chart', valid: st
     return full;
 }
 
+/** Resolves KPI names (`all` = every KPI), keeping the given order and dropping repeats. */
+export function resolveKpis(raw: string[]): string[] {
+    const names = raw.flatMap((name) => (name.trim().toLowerCase() === 'all' ? KPI_SUBTYPES : [name]));
+    return [...new Set(names.map((name) => normalizeSubtype(name, 'kpi', KPI_SUBTYPES)))];
+}
+
 interface WindowOptions {
     from?: string;
     to?: string;
@@ -75,17 +81,25 @@ export function registerMetrics(program: Command): void {
     withWindow(
         metrics
             .command('kpi')
-            .description('One KPI for a funnel, e.g. conversion_rate, new_contacts, total_sessions')
+            .description(
+                'KPIs for a funnel, e.g. conversion_rate total_sessions, or `all`. One KPI prints the API response ' +
+                    'as-is; several print {data: [...]} in the order given, each with its `type`.',
+            )
             .argument('<funnelId>')
-            .argument('<subtype>'),
+            .argument('<subtypes...>'),
     ).action(
-        action(async (ctx, funnelId: string, subtype: string, opts: WindowOptions) => {
-            const kpi = normalizeSubtype(subtype, 'kpi', KPI_SUBTYPES);
+        action(async (ctx, funnelId: string, subtypes: string[], opts: WindowOptions) => {
+            const kpis = resolveKpis(subtypes);
+            const query = resolveWindow(opts);
             const rest = new RestClient(await ctx.baseUrl(), await ctx.apiKey());
-            return rest.request({
-                path: `/funnels/${encodeURIComponent(funnelId)}/metrics/kpis/${kpi}`,
-                query: resolveWindow(opts),
-            });
+            const fetchKpi = (kpi: string) =>
+                rest.request<{ data: unknown }>({
+                    path: `/funnels/${encodeURIComponent(funnelId)}/metrics/kpis/${kpi}`,
+                    query,
+                });
+            if (kpis.length === 1) return fetchKpi(kpis[0]!);
+            const results = await Promise.all(kpis.map(fetchKpi));
+            return { data: results.map((result) => result.data) };
         }),
     );
 
