@@ -1,0 +1,131 @@
+import { createHash } from 'node:crypto';
+import { mkdtemp, stat } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { mask } from '../src/commands/auth.ts';
+import { KPI_SUBTYPES, normalizeSubtype, resolveWindow } from '../src/commands/metrics.ts';
+import { flattenFunnels } from '../src/commands/workspaces.ts';
+import { configPath, loadConfig, saveConfig } from '../src/config.ts';
+import { Context } from '../src/context.ts';
+import { CliError } from '../src/errors.ts';
+import { applyAssignments, parseAssignment } from '../src/input.ts';
+import { createPkcePair, isExpired } from '../src/oauth.ts';
+
+describe('assignments', () => {
+    it('parses JSON values and falls back to strings', () => {
+        expect(parseAssignment('limit=20')).toEqual([['limit'], 20]);
+        expect(parseAssignment('noBrand=true')).toEqual([['noBrand'], true]);
+        expect(parseAssignment('name=Spring sale')).toEqual([['name'], 'Spring sale']);
+        expect(parseAssignment('q=a=b')).toEqual([['q'], 'a=b']);
+    });
+
+    it('nests dotted keys and merges into existing objects', () => {
+        const target = { data: { name: 'x' } } as Record<string, unknown>;
+        applyAssignments(target, ['data.prompt=hi', 'data.noBrand=true']);
+        expect(target).toEqual({ data: { name: 'x', prompt: 'hi', noBrand: true } });
+    });
+
+    it('rejects malformed input as a usage error', () => {
+        expect(() => parseAssignment('novalue')).toThrow(CliError);
+    });
+});
+
+describe('metrics helpers', () => {
+    it('normalizes subtype spellings', () => {
+        expect(normalizeSubtype('conversion-rate', 'kpi', KPI_SUBTYPES)).toBe('kpi_conversion_rate');
+        expect(normalizeSubtype('kpi_new_contacts', 'kpi', KPI_SUBTYPES)).toBe('kpi_new_contacts');
+        expect(() => normalizeSubtype('nope', 'kpi', KPI_SUBTYPES)).toThrow(/Unknown kpi subtype/);
+    });
+
+    it('defaults to the last N days and honours explicit bounds', () => {
+        const now = new Date('2026-10-19T12:00:00.000Z');
+        const w = resolveWindow({ days: 7, tzOffset: '0' }, now);
+        expect(w).toEqual({ from: '2026-10-12T12:00:00.000Z', to: '2026-10-19T12:00:00.000Z', offset: '0' });
+        const explicit = resolveWindow({ from: '2026-09-01', to: '2026-10-01', days: 30, tzOffset: '120' }, now);
+        expect(explicit.from).toBe('2026-09-01T00:00:00.000Z');
+        expect(explicit.offset).toBe('120');
+        expect(() => resolveWindow({ from: '2026-10-02', to: '2026-10-01', days: 30 }, now)).toThrow(/before/);
+    });
+});
+
+describe('flattenFunnels', () => {
+    it('lifts campaigns out of workspaces', () => {
+        expect(
+            flattenFunnels([{ id: 'w1', name: 'Main', campaigns: [{ id: 'f1', name: 'Quiz', status: 'online' }] }]),
+        ).toEqual([{ id: 'f1', name: 'Quiz', status: 'online', workspaceId: 'w1', workspaceName: 'Main' }]);
+    });
+});
+
+describe('oauth helpers', () => {
+    it('creates an S256 PKCE pair', () => {
+        const { verifier, challenge } = createPkcePair();
+        expect(verifier).toMatch(/^[A-Za-z0-9_-]{43}$/);
+        expect(challenge).toBe(createHash('sha256').update(verifier).digest('base64url'));
+    });
+
+    it('treats tokens as expired one minute early', () => {
+        expect(isExpired({ accessToken: 'a', clientId: 'c', expiresAt: 1_000_000 }, 1_000_000 - 30_000)).toBe(true);
+        expect(isExpired({ accessToken: 'a', clientId: 'c', expiresAt: 1_000_000 }, 1_000_000 - 120_000)).toBe(false);
+        expect(isExpired({ accessToken: 'a', clientId: 'c' })).toBe(false);
+    });
+
+    it('masks secrets', () => {
+        expect(mask('abcd1234efgh')).toBe('abcd…efgh');
+        expect(mask('short')).toBe('••••');
+    });
+});
+
+describe('config + context', () => {
+    afterEach(() => vi.unstubAllGlobals());
+
+    async function tempEnv(): Promise<NodeJS.ProcessEnv> {
+        return { PERSPECTIVE_CONFIG_DIR: await mkdtemp(join(tmpdir(), 'pcli-')) };
+    }
+
+    it('stores credentials with 0600 permissions', async () => {
+        const env = await tempEnv();
+        await saveConfig({ apiKey: 'k' }, env);
+        expect((await stat(configPath(env))).mode & 0o777).toBe(0o600);
+        expect(await loadConfig(env)).toEqual({ apiKey: 'k' });
+    });
+
+    it('resolves flag > env > file', async () => {
+        const env = await tempEnv();
+        await saveConfig({ apiKey: 'from-file', baseUrl: 'https://file.example' }, env);
+        expect(await new Context({}, env).apiKey()).toBe('from-file');
+        expect(await new Context({}, { ...env, PERSPECTIVE_API_KEY: 'from-env' }).apiKey()).toBe('from-env');
+        expect(await new Context({ apiKey: 'from-flag' }, { ...env, PERSPECTIVE_API_KEY: 'from-env' }).apiKey()).toBe(
+            'from-flag',
+        );
+        expect(await new Context({ baseUrl: 'https://flag.example/' }, env).baseUrl()).toBe('https://flag.example');
+    });
+
+    it('fails with unauthenticated when nothing is configured', async () => {
+        const env = await tempEnv();
+        await expect(new Context({}, env).apiKey()).rejects.toMatchObject({ code: 'unauthenticated' });
+        await expect(new Context({}, env).accessToken()).rejects.toMatchObject({ code: 'unauthenticated' });
+    });
+
+    it('refreshes an expired token and persists it', async () => {
+        const env = await tempEnv();
+        await saveConfig(
+            { oauth: { accessToken: 'old', refreshToken: 'r1', expiresAt: Date.now() - 1000, clientId: 'c' } },
+            env,
+        );
+        const fetchMock = vi.fn(async () =>
+            new Response(JSON.stringify({ access_token: 'new', expires_in: 3600 }), {
+                status: 200,
+                headers: { 'content-type': 'application/json' },
+            }),
+        );
+        vi.stubGlobal('fetch', fetchMock);
+
+        expect(await new Context({ baseUrl: 'https://api.example.com' }, env).accessToken()).toBe('new');
+        const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+        expect(url).toBe('https://api.example.com/oauth/token');
+        expect(String(init.body)).toContain('grant_type=refresh_token');
+        const saved = await loadConfig(env);
+        expect(saved.oauth).toMatchObject({ accessToken: 'new', refreshToken: 'r1', clientId: 'c' });
+    });
+});
