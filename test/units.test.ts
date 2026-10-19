@@ -9,6 +9,7 @@ import { configPath, loadConfig, saveConfig } from '../src/config.ts';
 import { Context } from '../src/context.ts';
 import { CliError } from '../src/errors.ts';
 import { applyAssignments, parseAssignment } from '../src/input.ts';
+import { selectFields } from '../src/output.ts';
 
 describe('assignments', () => {
     it('parses JSON values and falls back to strings', () => {
@@ -90,4 +91,39 @@ describe('config + context', () => {
         await expect(new Context({}, env).apiKey()).rejects.toMatchObject({ code: 'unauthenticated' });
     });
 
+});
+
+describe('selectFields', () => {
+    const page = {
+        data: [
+            { id: 'c1', email: 'a@x.co', status: 'new', properties: { city: 'Berlin' } },
+            { id: 'c2', email: 'b@x.co' },
+        ],
+        meta: { total: 2 },
+    };
+
+    it('keeps the listed fields of each item and the meta', () => {
+        expect(selectFields(page, 'id,email')).toEqual({
+            data: [
+                { id: 'c1', email: 'a@x.co' },
+                { id: 'c2', email: 'b@x.co' },
+            ],
+            meta: { total: 2 },
+        });
+    });
+
+    it('reaches into nested objects and fills missing fields with null', () => {
+        expect(selectFields(page, 'id, properties.city')).toEqual({
+            data: [
+                { id: 'c1', 'properties.city': 'Berlin' },
+                { id: 'c2', 'properties.city': null },
+            ],
+            meta: { total: 2 },
+        });
+    });
+
+    it('works on a single object and on results without a data envelope', () => {
+        expect(selectFields({ data: { type: 'kpi', value: 3 } }, 'value')).toEqual({ data: { value: 3 } });
+        expect(selectFields({ kpi: ['a'], chart: ['b'] }, 'kpi')).toEqual({ kpi: ['a'] });
+    });
 });

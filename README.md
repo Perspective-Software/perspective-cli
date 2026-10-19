@@ -34,12 +34,17 @@ The key is stored in `~/.config/perspective/credentials.json` (mode 0600). In CI
 ```bash
 perspective funnels list --status live
 perspective contacts list <funnelId> --all
+perspective contacts list <funnelId> --all --fields id,email,status
+perspective contacts create <funnelId> --email ada@example.com --first-name Ada --dry-run
 perspective contacts create <funnelId> --email ada@example.com --first-name Ada
 perspective metrics kpi <funnelId> conversion_rate --days 7
 perspective metrics chart <funnelId> visitor_devices --from 2026-09-01 --to 2026-10-01
 ```
 
 Output is pretty-printed at a terminal and compact when piped (`--pretty` / `--no-pretty`).
+`--fields a,b,c.d` keeps only those fields of each result. `--dry-run` on `contacts create`
+and `contacts set` prints the request instead of sending it. On HTTP 429 the CLI waits
+(`Retry-After`, at most a minute) and retries up to 3 times.
 
 ### Exit codes
 

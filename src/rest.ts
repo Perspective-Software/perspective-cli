@@ -11,16 +11,36 @@ export interface RestRequest {
 
 const USER_AGENT = 'perspective-cli';
 
+export interface RestClientOptions {
+    /** Retries after HTTP 429. The request was not processed, so retrying is safe for writes too. */
+    maxRetries?: number;
+    sleep?: (ms: number) => Promise<void>;
+}
+
+const MAX_RETRY_WAIT_MS = 60_000;
+
+/** Waits as long as Retry-After (or RateLimit-Reset) says, else 2^attempt seconds; never more than a minute. */
+export function retryDelayMs(res: Response, attempt: number): number {
+    const header = res.headers.get('retry-after') ?? res.headers.get('ratelimit-reset');
+    const seconds = header !== null && header.trim() !== '' ? Number(header) : NaN;
+    const ms = Number.isFinite(seconds) && seconds >= 0 ? seconds * 1000 : 2 ** attempt * 1000;
+    return Math.min(ms, MAX_RETRY_WAIT_MS);
+}
+
 /** Client for the External API under /v1. Returns the parsed JSON body as-is ({data} / {data, meta}). */
 export class RestClient {
     readonly baseUrl: string;
     private readonly apiKey: string;
     private readonly fetchImpl: typeof fetch;
+    private readonly maxRetries: number;
+    private readonly sleep: (ms: number) => Promise<void>;
 
-    constructor(baseUrl: string, apiKey: string, fetchImpl: typeof fetch = fetch) {
+    constructor(baseUrl: string, apiKey: string, fetchImpl: typeof fetch = fetch, options: RestClientOptions = {}) {
         this.baseUrl = baseUrl;
         this.apiKey = apiKey;
         this.fetchImpl = fetchImpl;
+        this.maxRetries = options.maxRetries ?? 3;
+        this.sleep = options.sleep ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
     }
 
     url(path: string, query: Query = {}): string {
@@ -31,21 +51,31 @@ export class RestClient {
         return url.toString();
     }
 
+    /** What `request` would send, without sending it (for --dry-run). The API key is left out. */
+    describe({ method = 'GET', path, query, body }: RestRequest): Record<string, unknown> {
+        return { method, url: this.url(path, query), ...(body !== undefined && { body }) };
+    }
+
     async request<T = unknown>({ method = 'GET', path, query, body }: RestRequest): Promise<T> {
         let res: Response;
-        try {
-            res = await this.fetchImpl(this.url(path, query), {
-                method,
-                headers: {
-                    'x-perspective-api-key': this.apiKey,
-                    accept: 'application/json',
-                    'user-agent': USER_AGENT,
-                    ...(body !== undefined && { 'content-type': 'application/json' }),
-                },
-                body: body === undefined ? undefined : JSON.stringify(body),
-            });
-        } catch (err) {
-            throw new CliError('network', `Could not reach ${this.baseUrl}: ${(err as Error).message}`);
+        for (let attempt = 0; ; attempt++) {
+            try {
+                res = await this.fetchImpl(this.url(path, query), {
+                    method,
+                    headers: {
+                        'x-perspective-api-key': this.apiKey,
+                        accept: 'application/json',
+                        'user-agent': USER_AGENT,
+                        ...(body !== undefined && { 'content-type': 'application/json' }),
+                    },
+                    body: body === undefined ? undefined : JSON.stringify(body),
+                });
+            } catch (err) {
+                throw new CliError('network', `Could not reach ${this.baseUrl}: ${(err as Error).message}`);
+            }
+            if (res.status !== 429 || attempt >= this.maxRetries) break;
+            await res.body?.cancel();
+            await this.sleep(retryDelayMs(res, attempt));
         }
 
         const text = await res.text();
@@ -75,7 +105,7 @@ function httpError(res: Response, body: unknown): CliError {
               ? 'Either the funnel ID is wrong or not in a workspace this key can access (check `perspective funnels list`), ' +
                 'or the key lacks the permission this endpoint needs (crm:read, crm:write, metrics:read).'
               : code === 'rate_limited'
-                ? `Rate limit is 100 requests/minute.${retryAfter ? ` Retry in ${retryAfter}s.` : ''}`
+                ? `Rate limit is 100 requests/minute, and the CLI already retried.${retryAfter ? ` Retry in ${retryAfter}s.` : ''}`
                 : undefined;
     return new CliError(code, message, { status: res.status, hint });
 }

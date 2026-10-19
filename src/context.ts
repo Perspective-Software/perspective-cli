@@ -4,6 +4,7 @@ import { DEFAULT_BASE_URL, loadConfig, type StoredConfig } from './config.ts';
 export interface GlobalOptions {
     baseUrl?: string;
     apiKey?: string;
+    fields?: string;
     pretty?: boolean;
 }
 

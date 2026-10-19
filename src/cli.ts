@@ -22,6 +22,7 @@ function buildProgram(): Command {
         .version(version)
         .option('--base-url <url>', 'API origin (env PERSPECTIVE_BASE_URL)', undefined)
         .option('--api-key <key>', 'API key (env PERSPECTIVE_API_KEY)')
+        .option('--fields <list>', 'only these fields of each result, comma-separated; dots nest (id,email,properties.city)')
         .option('--pretty', 'indent JSON output (default when stdout is a terminal)')
         .option('--no-pretty', 'compact JSON output (default when piped)')
         .showHelpAfterError()

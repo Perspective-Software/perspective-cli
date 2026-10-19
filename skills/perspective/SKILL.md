@@ -44,6 +44,7 @@ perspective contacts set <funnelId> <contactId> status qualified   # any field o
 ```
 
 Pagination is page-based: read `meta.hasNext`, bump `--page`, or just use `--all`.
+The CLI waits and retries by itself when it hits the rate limit.
 `-s key=value` values are parsed as JSON when valid (`-s score=5`); dots nest (`-s address.city=Berlin`).
 
 ## 3. Metrics
@@ -58,6 +59,16 @@ perspective metrics insight <funnelId> question_1234 --days 7
 perspective metrics subtypes                        # valid kpi/chart names
 ```
 
+## Keep output small
+
+Contact lists can be large. Ask only for the fields you need — `--fields` works on
+every command, keeps `meta`, and dots reach into nested objects:
+
+```bash
+perspective contacts list <funnelId> --all --fields id,email,status,properties.city
+perspective funnels list --status live --fields id,name
+```
+
 ## Exit codes
 
 | Code | `error.code` | Meaning / what to do |
@@ -68,11 +79,11 @@ perspective metrics subtypes                        # valid kpi/chart names
 | 3 | `unauthenticated` | Missing/invalid API key — see step 0 |
 | 4 | `forbidden` | Key lacks the permission (`crm:read`, `crm:write`, `metrics:read`) or plan |
 | 5 | `not_found` | Wrong funnel or contact ID — re-discover IDs |
-| 6 | `rate_limited` | 100 requests/minute — wait and retry; prefer `--all` over many small calls |
+| 6 | `rate_limited` | 100 requests/minute; the CLI already retried — wait a minute; prefer `--all` over many small calls |
 | 7 | `network` | API unreachable |
 
 ## Rules for agents
 
-- **Read before you write.** `contacts create` and `contacts set` act on a live account and can trigger automations and emails to real people. Confirm with the user before running them unless they explicitly asked for that exact change. Pass `--skip-automation` to either command when the user wants data without side effects.
+- **Read before you write.** `contacts create` and `contacts set` act on a live account and can trigger automations and emails to real people. Run them with `--dry-run` first, show the user the printed request, and send it only after they confirm — unless they explicitly asked for that exact change. Pass `--skip-automation` to either command when the user wants data without side effects.
 - Dates are ISO 8601. Metrics windows: `--from/--to`, or `--days N` (default 30).
-- Global flags: `--base-url`, `--api-key`, `--pretty`/`--no-pretty`.
+- Global flags: `--fields`, `--base-url`, `--api-key`, `--pretty`/`--no-pretty`.

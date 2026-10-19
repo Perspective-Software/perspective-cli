@@ -2,11 +2,18 @@ import { Option, type Command } from 'commander';
 import { action } from '../command.ts';
 import { usage } from '../errors.ts';
 import { applyAssignments, collect, parseInteger, readJsonObject } from '../input.ts';
-import { RestClient } from '../rest.ts';
+import type { Context } from '../context.ts';
+import { RestClient, type RestRequest } from '../rest.ts';
 
 const SORT_FIELDS = ['ps_converted_at', 'email', 'firstName', 'lastName'];
 /** Server-side cap on `limit`. */
 const MAX_LIMIT = 100;
+
+/** Sends a write, or with --dry-run returns what would be sent. A dry run needs no API key. */
+async function send(ctx: Context, dryRun: boolean | undefined, req: RestRequest): Promise<unknown> {
+    if (dryRun) return { dryRun: true, request: new RestClient(await ctx.baseUrl(), '').describe(req) };
+    return new RestClient(await ctx.baseUrl(), await ctx.apiKey()).request(req);
+}
 
 interface ContactsPage {
     data: unknown[];
@@ -86,6 +93,7 @@ export function registerContacts(program: Command): void {
         .option('-s, --set <key=value>', 'any body field, repeatable; dots nest (address.city=Berlin)', collect, [])
         .option('--data <json>', 'full request body as JSON, @file or - for stdin; flags override it')
         .option('--skip-automation', 'do not trigger automations for the initial status')
+        .option('--dry-run', 'print the request instead of sending it')
         .action(
             action(
                 async (
@@ -102,6 +110,7 @@ export function registerContacts(program: Command): void {
                         set: string[];
                         data?: string;
                         skipAutomation?: boolean;
+                        dryRun?: boolean;
                     },
                 ) => {
                     const body = opts.data ? await readJsonObject(opts.data, '--data') : {};
@@ -119,8 +128,7 @@ export function registerContacts(program: Command): void {
                     if (opts.skipAutomation) body.skipAutomationTrigger = true;
                     if (!body.email && !body.phone) throw usage('A contact needs --email or --phone');
 
-                    const rest = new RestClient(await ctx.baseUrl(), await ctx.apiKey());
-                    return rest.request({
+                    return send(ctx, opts.dryRun, {
                         method: 'POST',
                         path: `/funnels/${encodeURIComponent(funnelId)}/contacts`,
                         body,
@@ -139,6 +147,7 @@ export function registerContacts(program: Command): void {
         .argument('<field>')
         .argument('<value>')
         .option('--skip-automation', 'do not trigger automations for this change')
+        .option('--dry-run', 'print the request instead of sending it')
         .action(
             action(
                 async (
@@ -147,10 +156,9 @@ export function registerContacts(program: Command): void {
                     contactId: string,
                     field: string,
                     value: string,
-                    opts: { skipAutomation?: boolean },
-                ) => {
-                    const rest = new RestClient(await ctx.baseUrl(), await ctx.apiKey());
-                    return rest.request({
+                    opts: { skipAutomation?: boolean; dryRun?: boolean },
+                ) =>
+                    send(ctx, opts.dryRun, {
                         method: 'PUT',
                         path: `/funnels/${encodeURIComponent(funnelId)}/contacts/${encodeURIComponent(contactId)}/values`,
                         body: {
@@ -158,8 +166,7 @@ export function registerContacts(program: Command): void {
                             value,
                             ...(opts.skipAutomation && { skipAutomationTrigger: true }),
                         },
-                    });
-                },
+                    }),
             ),
         );
 }

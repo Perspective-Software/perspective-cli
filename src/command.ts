@@ -1,6 +1,6 @@
 import type { Command } from 'commander';
 import { Context, type GlobalOptions } from './context.ts';
-import { printError, printResult } from './output.ts';
+import { printError, printResult, selectFields } from './output.ts';
 
 type Handler = (ctx: Context, ...args: any[]) => Promise<unknown>;
 
@@ -15,7 +15,8 @@ export function action(handler: Handler) {
         const globals = command.optsWithGlobals<GlobalOptions>();
         const ctx = new Context(globals);
         try {
-            printResult(await handler(ctx, ...args.slice(0, -1)), { pretty: globals.pretty });
+            const result = await handler(ctx, ...args.slice(0, -1));
+            printResult(globals.fields ? selectFields(result, globals.fields) : result, { pretty: globals.pretty });
         } catch (err) {
             process.exitCode = printError(err, { pretty: globals.pretty });
         }
