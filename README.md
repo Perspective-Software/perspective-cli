@@ -12,7 +12,7 @@ Full docs: <https://developers.perspective.co/cli/overview>
 Requires Node.js ≥ 22.12.
 
 ```bash
-npm install -g @perspective-software/cli
+npm install -g @perspective-software/cli    # or: pnpm add -g @perspective-software/cli
 perspective --help
 ```
 
@@ -76,10 +76,10 @@ perspective skill show               # print it (JSON; | jq -r .content)
 ## Development
 
 ```bash
-npm install          # also builds dist/ via `prepare`
-npm test
-npm run typecheck
-npm run dev -- funnels list          # run from source (Node's type stripping)
+pnpm install                         # also builds dist/ via `prepare`
+pnpm test
+pnpm typecheck
+pnpm dev funnels list                # run from source (Node's type stripping)
 perspective --base-url http://localhost:3000 …   # point at a local External API
 ```
 

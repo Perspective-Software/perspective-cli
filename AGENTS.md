@@ -9,4 +9,4 @@
 - Every command goes through `action()` in `src/command.ts`.
 - Changing a command means updating `skills/perspective/SKILL.md`, `README.md`, and the
   developer docs (`developer-docs/docs/cli/`).
-- Verify with `npm run typecheck`, `npm test` and `npm run build`.
+- Use pnpm, not npm. Verify with `pnpm typecheck`, `pnpm test` and `pnpm build`.
