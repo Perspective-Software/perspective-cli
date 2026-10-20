@@ -12,7 +12,7 @@ Full docs: <https://developers.perspective.co/cli/overview>
 Requires Node.js ≥ 22.12.
 
 ```bash
-npm install -g github:Perspective-Software/perspective-cli
+npm install -g @perspective-software/cli
 perspective --help
 ```
 
@@ -88,3 +88,9 @@ Layout: `src/cli.ts` (entry) · `src/commands/*` (one file per command group) ·
 
 When you add or change a command, update `SKILL.md` and the docs in
 `Perspective-Software/developer-docs` (`docs/cli/`) in the same change.
+
+## Releasing
+
+1. Bump the version: `npm version patch` (or `minor`). This commits and creates the `v…` tag.
+2. `git push --follow-tags`. The Release workflow checks that the tag matches `package.json`,
+   runs typecheck and tests, and publishes to npm via trusted publishing (no npm token).
