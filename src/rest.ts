@@ -15,6 +15,8 @@ export interface RestClientOptions {
     /** Retries after HTTP 429. The request was not processed, so retrying is safe for writes too. */
     maxRetries?: number;
     sleep?: (ms: number) => Promise<void>;
+    /** Per attempt, including reading the body. */
+    timeoutMs?: number;
 }
 
 const MAX_RETRY_WAIT_MS = 60_000;
@@ -34,12 +36,14 @@ export class RestClient {
     private readonly fetchImpl: typeof fetch;
     private readonly maxRetries: number;
     private readonly sleep: (ms: number) => Promise<void>;
+    private readonly timeoutMs: number;
 
     constructor(baseUrl: string, apiKey: string, fetchImpl: typeof fetch = fetch, options: RestClientOptions = {}) {
         this.baseUrl = baseUrl;
         this.apiKey = apiKey;
         this.fetchImpl = fetchImpl;
         this.maxRetries = options.maxRetries ?? 3;
+        this.timeoutMs = options.timeoutMs ?? 30_000;
         this.sleep = options.sleep ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
     }
 
@@ -58,7 +62,9 @@ export class RestClient {
 
     async request<T = unknown>({ method = 'GET', path, query, body }: RestRequest): Promise<T> {
         let res: Response;
+        let text: string;
         for (let attempt = 0; ; attempt++) {
+            const signal = AbortSignal.timeout(this.timeoutMs);
             try {
                 res = await this.fetchImpl(this.url(path, query), {
                     method,
@@ -69,16 +75,20 @@ export class RestClient {
                         ...(body !== undefined && { 'content-type': 'application/json' }),
                     },
                     body: body === undefined ? undefined : JSON.stringify(body),
+                    signal,
                 });
+                if (res.status !== 429 || attempt >= this.maxRetries) {
+                    text = await res.text();
+                    break;
+                }
             } catch (err) {
-                throw new CliError('network', `Could not reach ${this.baseUrl}: ${(err as Error).message}`);
+                const reason = signal.aborted ? `no response within ${this.timeoutMs / 1000}s` : (err as Error).message;
+                throw new CliError('network', `Could not reach ${this.baseUrl}: ${reason}`);
             }
-            if (res.status !== 429 || attempt >= this.maxRetries) break;
             await res.body?.cancel();
             await this.sleep(retryDelayMs(res, attempt));
         }
 
-        const text = await res.text();
         let parsed: unknown = undefined;
         try {
             parsed = text ? JSON.parse(text) : undefined;

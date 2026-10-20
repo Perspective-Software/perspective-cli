@@ -45,6 +45,10 @@ export function parseAssignment(raw: string): [string[], unknown] {
     } catch {
         // plain string
     }
+    // Keep integers that a double can't hold exactly (e.g. long IDs) as text.
+    if (typeof value === 'number' && /^\s*-?\d+\s*$/.test(text) && BigInt(text.trim()) !== BigInt(value)) {
+        value = text;
+    }
     return [key.split('.'), value];
 }
 
@@ -66,11 +70,14 @@ export function collect(value: string, previous: string[] = []): string[] {
     return [...previous, value];
 }
 
-export function parseInteger(name: string, min: number, max = Number.MAX_SAFE_INTEGER) {
+/** Without `min`, any integer is accepted. */
+export function parseInteger(name: string, min?: number, max = Number.MAX_SAFE_INTEGER) {
     return (value: string): number => {
-        const n = Number(value);
-        if (!Number.isInteger(n) || n < min || n > max) {
-            throw usage(`--${name} must be an integer between ${min} and ${max}`);
+        const n = value.trim() === '' ? NaN : Number(value);
+        if (!Number.isSafeInteger(n) || (min !== undefined && (n < min || n > max))) {
+            throw usage(
+                min === undefined ? `--${name} must be an integer` : `--${name} must be an integer between ${min} and ${max}`,
+            );
         }
         return n;
     };

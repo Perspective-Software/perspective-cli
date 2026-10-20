@@ -17,7 +17,8 @@ Docs: https://developers.perspective.co/cli/overview
 perspective auth status
 ```
 
-If `authenticated` is `false`, every other command fails with exit code 3. Ask the
+If `authenticated` is `false`, every command that calls the API fails with exit code 3
+(`skill show` and `skill install` work without a key). Ask the
 user for an API key (Perspective → Settings → API Keys, admins only). They can run
 `perspective auth login` themselves (it prompts for the key), or you can pipe it in:
 `printf %s "$KEY" | perspective auth login`. `PERSPECTIVE_API_KEY` works too.

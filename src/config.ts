@@ -1,6 +1,7 @@
 import { chmod, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
+import { CliError } from './errors.ts';
 
 export const DEFAULT_BASE_URL = 'https://api.perspective.co';
 
@@ -20,12 +21,26 @@ export function configPath(env: NodeJS.ProcessEnv = process.env): string {
 }
 
 export async function loadConfig(env: NodeJS.ProcessEnv = process.env): Promise<StoredConfig> {
+    const path = configPath(env);
+    let text: string;
     try {
-        return JSON.parse(await readFile(configPath(env), 'utf8')) as StoredConfig;
+        text = await readFile(path, 'utf8');
     } catch (err) {
         if ((err as NodeJS.ErrnoException).code === 'ENOENT') return {};
         throw err;
     }
+    let parsed: unknown;
+    try {
+        parsed = JSON.parse(text);
+    } catch {
+        parsed = undefined;
+    }
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+        throw new CliError('error', `${path} is not a JSON object`, {
+            hint: 'Run `perspective auth logout` to delete it, then `perspective auth login`.',
+        });
+    }
+    return parsed as StoredConfig;
 }
 
 /** The file holds secrets: the directory is 0700 and the file 0600. */

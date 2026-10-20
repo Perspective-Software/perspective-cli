@@ -92,3 +92,16 @@ describe('RestClient rate limiting', () => {
         expect(JSON.stringify(described)).not.toContain('secret');
     });
 });
+
+describe('RestClient timeout', () => {
+    it('fails with the network code when the API does not answer', async () => {
+        const impl = ((_url: string, init: RequestInit) =>
+            new Promise((_, reject) => init.signal!.addEventListener('abort', () => reject(init.signal!.reason)))) as typeof fetch;
+        const err = (await new RestClient('https://x', 'k', impl, { timeoutMs: 20 })
+            .request({ path: '/workspaces' })
+            .catch((e) => e)) as CliError;
+        expect(err.code).toBe('network');
+        expect(err.exitCode).toBe(ExitCode.NETWORK);
+        expect(err.message).toMatch(/no response within/);
+    });
+});

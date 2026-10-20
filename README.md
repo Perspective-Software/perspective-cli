@@ -70,7 +70,7 @@ anything else that reads Agent Skills) how to use the CLI safely. Install it wit
 ```bash
 perspective skill install            # ~/.claude/skills/perspective/SKILL.md
 perspective skill install --project  # ./.claude/skills/perspective/SKILL.md
-perspective skill show               # print it
+perspective skill show               # print it (JSON; | jq -r .content)
 ```
 
 ## Development

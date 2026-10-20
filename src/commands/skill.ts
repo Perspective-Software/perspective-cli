@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -13,10 +13,8 @@ export function registerSkill(program: Command): void {
 
     skill
         .command('show')
-        .description('Print SKILL.md (markdown, not JSON)')
-        .action(async () => {
-            process.stdout.write(await readFile(SKILL_SOURCE, 'utf8'));
-        });
+        .description('Print SKILL.md as {path, content}; `| jq -r .content` gives the markdown')
+        .action(action(async () => ({ path: SKILL_SOURCE, content: await readFile(SKILL_SOURCE, 'utf8') })));
 
     skill
         .command('install')
@@ -32,7 +30,15 @@ export function registerSkill(program: Command): void {
                       : join(homedir(), '.claude', 'skills');
                 const target = join(root, 'perspective', 'SKILL.md');
                 await mkdir(join(root, 'perspective'), { recursive: true });
-                await writeFile(target, await readFile(SKILL_SOURCE, 'utf8'));
+                // Write a temp file and rename it over the target, so a failed write never leaves half a skill.
+                const temp = `${target}.${process.pid}.tmp`;
+                try {
+                    await writeFile(temp, await readFile(SKILL_SOURCE, 'utf8'));
+                    await rename(temp, target);
+                } catch (err) {
+                    await rm(temp, { force: true });
+                    throw err;
+                }
                 return { ok: true, installed: target };
             }),
         );

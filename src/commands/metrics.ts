@@ -46,7 +46,7 @@ interface WindowOptions {
     from?: string;
     to?: string;
     days: number;
-    tzOffset?: string;
+    tzOffset?: number;
 }
 
 function parseDate(name: string, value: string): Date {
@@ -61,7 +61,7 @@ export function resolveWindow(opts: WindowOptions, now = new Date()) {
     const from = opts.from ? parseDate('from', opts.from) : new Date(to.getTime() - opts.days * 86_400_000);
     if (from >= to) throw usage('--from must be before --to');
     // The API wants minutes east of UTC (UTC+2 → "120"); getTimezoneOffset is minutes west.
-    const offset = opts.tzOffset ?? String(-now.getTimezoneOffset());
+    const offset = String(opts.tzOffset ?? -now.getTimezoneOffset());
     return { from: from.toISOString(), to: to.toISOString(), offset };
 }
 
@@ -70,7 +70,11 @@ function withWindow(cmd: Command): Command {
         .option('--from <date>', 'start of the period (ISO 8601)')
         .option('--to <date>', 'end of the period (ISO 8601), default now')
         .option('--days <n>', 'period length when --from is not given', parseInteger('days', 1, 3650), 30)
-        .option('--tz-offset <minutes>', 'timezone offset in minutes east of UTC, default: local timezone');
+        .option(
+            '--tz-offset <minutes>',
+            'timezone offset in minutes east of UTC, default: local timezone',
+            parseInteger('tz-offset'),
+        );
 }
 
 export function registerMetrics(program: Command): void {

@@ -1,4 +1,4 @@
-import { mkdtemp, stat } from 'node:fs/promises';
+import { mkdtemp, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -8,7 +8,7 @@ import { flattenFunnels } from '../src/commands/workspaces.ts';
 import { configPath, loadConfig, saveConfig } from '../src/config.ts';
 import { Context } from '../src/context.ts';
 import { CliError } from '../src/errors.ts';
-import { applyAssignments, parseAssignment } from '../src/input.ts';
+import { applyAssignments, parseAssignment, parseInteger } from '../src/input.ts';
 import { selectFields } from '../src/output.ts';
 
 describe('assignments', () => {
@@ -39,9 +39,9 @@ describe('metrics helpers', () => {
 
     it('defaults to the last N days and honours explicit bounds', () => {
         const now = new Date('2026-10-19T12:00:00.000Z');
-        const w = resolveWindow({ days: 7, tzOffset: '0' }, now);
+        const w = resolveWindow({ days: 7, tzOffset: 0 }, now);
         expect(w).toEqual({ from: '2026-10-12T12:00:00.000Z', to: '2026-10-19T12:00:00.000Z', offset: '0' });
-        const explicit = resolveWindow({ from: '2026-09-01', to: '2026-10-01', days: 30, tzOffset: '120' }, now);
+        const explicit = resolveWindow({ from: '2026-09-01', to: '2026-10-01', days: 30, tzOffset: 120 }, now);
         expect(explicit.from).toBe('2026-09-01T00:00:00.000Z');
         expect(explicit.offset).toBe('120');
         expect(() => resolveWindow({ from: '2026-10-02', to: '2026-10-01', days: 30 }, now)).toThrow(/before/);
@@ -142,5 +142,38 @@ describe('resolveKpis', () => {
 
     it('rejects unknown names with the valid list', () => {
         expect(() => resolveKpis(['conversion_rate', 'bogus'])).toThrow(CliError);
+    });
+});
+
+describe('review fixes', () => {
+    it('keeps integers a double cannot hold as text, other numbers as numbers', () => {
+        expect(parseAssignment('id=12345678901234567890')).toEqual([['id'], '12345678901234567890']);
+        expect(parseAssignment('n=1e3')).toEqual([['n'], 1000]);
+        expect(parseAssignment('n=1.0')).toEqual([['n'], 1]);
+        expect(parseAssignment('n=-42')).toEqual([['n'], -42]);
+    });
+
+    it('parses --tz-offset as an integer', () => {
+        const parse = parseInteger('tz-offset');
+        expect(parse('-300')).toBe(-300);
+        for (const bad of ['abc', '+2h', '1.5', '']) expect(() => parse(bad)).toThrow(/integer/);
+    });
+
+    it('reports a broken credentials file as a CliError pointing to logout', async () => {
+        for (const content of ['{nope', 'null', '[]']) {
+            const dir = await mkdtemp(join(tmpdir(), 'perspective-cli-'));
+            await writeFile(join(dir, 'credentials.json'), content);
+            const err = (await loadConfig({ PERSPECTIVE_CONFIG_DIR: dir }).catch((e) => e)) as CliError;
+            expect(err).toBeInstanceOf(CliError);
+            expect(err.hint).toMatch(/auth logout/);
+        }
+    });
+
+    it('treats an empty base URL as unset and rejects an invalid one', async () => {
+        const dir = await mkdtemp(join(tmpdir(), 'perspective-cli-'));
+        const env = { PERSPECTIVE_CONFIG_DIR: dir, PERSPECTIVE_BASE_URL: '' };
+        expect(await new Context({}, env).baseUrl()).toBe('https://api.perspective.co');
+        const err = (await new Context({ baseUrl: 'not a url' }, env).baseUrl().catch((e) => e)) as CliError;
+        expect(err.code).toBe('usage');
     });
 });

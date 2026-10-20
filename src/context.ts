@@ -28,11 +28,17 @@ export class Context {
     }
 
     async baseUrl(): Promise<string> {
+        // `||`, not `??`: an empty value (e.g. an unset CI variable) means "not set".
         const url =
-            this.opts.baseUrl ??
-            this.env.PERSPECTIVE_BASE_URL ??
-            (await this.stored()).baseUrl ??
+            this.opts.baseUrl ||
+            this.env.PERSPECTIVE_BASE_URL ||
+            (await this.stored()).baseUrl ||
             DEFAULT_BASE_URL;
+        if (!URL.canParse(url)) {
+            throw new CliError('usage', `Invalid base URL "${url}"`, {
+                hint: 'Check --base-url, PERSPECTIVE_BASE_URL or the baseUrl in the credentials file.',
+            });
+        }
         return url.replace(/\/+$/, '');
     }
 
