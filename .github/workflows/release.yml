@@ -16,13 +16,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 24
           registry-url: https://registry.npmjs.org
+          # No dependency cache in the job that can publish (cache-poisoning hardening).
       # Trusted publishing needs npm 11.5.1 or newer.
       - run: npm install -g npm@latest
-      - run: npm ci
+      - run: pnpm install --frozen-lockfile
       - name: Tag matches package.json version
         run: test "v$(node -p 'require(`./package.json`).version')" = "$GITHUB_REF_NAME"
+      # npm, not pnpm, publishes: npm does the trusted-publishing (OIDC) exchange.
+      # prepublishOnly still runs typecheck and tests through pnpm.
       - run: npm publish

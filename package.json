@@ -40,7 +40,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "prepare": "npm run build",
-    "prepublishOnly": "npm run typecheck && npm test"
+    "prepublishOnly": "pnpm typecheck && pnpm test"
   },
   "dependencies": {
     "commander": "^15.0.0"
@@ -49,5 +49,6 @@
     "@types/node": "^22.12.0",
     "typescript": "^7.0.2",
     "vitest": "^5.0.5"
-  }
+  },
+  "packageManager": "pnpm@10.10.0"
 }
