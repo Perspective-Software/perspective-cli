@@ -2,7 +2,7 @@
   "name": "@perspective-software/cli",
   "version": "0.1.0",
   "description": "Command-line interface for the Perspective External API",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "keywords": [
     "perspective",
     "cli",
