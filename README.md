@@ -12,7 +12,7 @@ Full docs: <https://developers.perspective.co/cli/overview>
 Requires Node.js ≥ 22.12.
 
 ```bash
-npm install -g github:Perspective-Software/perspective-cli
+npm install -g @perspective-software/cli
 perspective --help
 ```
 

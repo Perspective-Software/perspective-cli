@@ -2,8 +2,26 @@
   "name": "@perspective-software/cli",
   "version": "0.1.0",
   "description": "Command-line interface for the Perspective External API",
-  "private": true,
-  "license": "UNLICENSED",
+  "license": "MIT",
+  "keywords": [
+    "perspective",
+    "cli",
+    "funnels",
+    "agents",
+    "claude-code",
+    "skill"
+  ],
+  "homepage": "https://developers.perspective.co/cli/overview",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Perspective-Software/perspective-cli.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Perspective-Software/perspective-cli/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "type": "module",
   "bin": {
     "perspective": "dist/cli.js"
@@ -16,11 +34,13 @@
     "node": ">=22.12.0"
   },
   "scripts": {
+    "prebuild": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
     "build": "tsc -p tsconfig.build.json",
     "dev": "node --experimental-strip-types src/cli.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
-    "prepare": "npm run build"
+    "prepare": "npm run build",
+    "prepublishOnly": "npm run typecheck && npm test"
   },
   "dependencies": {
     "commander": "^15.0.0"
